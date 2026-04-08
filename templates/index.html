@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Poultry Farm IoT</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #f5f5f5;
+      transition: 0.3s;
+    }
+
+    .dark {
+      background: #121212;
+      color: white;
+    }
+
+    .box {
+      background: white;
+      margin: 30px auto;
+      padding: 20px;
+      width: 90%;
+      max-width: 400px;
+      border-radius: 15px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      transition: 0.3s;
+    }
+
+    .dark .box {
+      background: #1e1e1e;
+    }
+
+    .safe { color: green; }
+    .danger { color: red; }
+
+    button {
+      padding: 10px 15px;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .toggle-btn { background: #333; color: white; }
+    .download-btn { background: #007bff; color: white; }
+
+    canvas {
+      margin-top: 20px;
+      width: 95% !important;
+      max-width: 700px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>🐓 Poultry Farm Dashboard</h2>
+
+<button class="toggle-btn" onclick="toggleDark()">🌙 Toggle Dark Mode</button>
+<button class="download-btn" onclick="downloadData()">📥 Download Data</button>
+
+<div class="box">
+  <p>🌡️ Temperature: <span id="temp">--</span> °C</p>
+  <p>💧 Humidity: <span id="hum">--</span> %</p>
+  <p>🔥 Gas: <span id="gas">--</span></p>
+  <p>Status: <span id="status">WAITING</span></p>
+</div>
+
+<canvas id="chart"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// -------- DARK MODE --------
+function toggleDark() {
+  document.body.classList.toggle("dark");
+}
+
+// -------- LIVE DATA --------
+function updateData() {
+  fetch('/data')
+    .then(res => res.json())
+    .then(data => {
+
+      document.getElementById("temp").innerText = data.temperature;
+      document.getElementById("hum").innerText = data.humidity;
+      document.getElementById("gas").innerText = data.gas;
+
+      let statusEl = document.getElementById("status");
+      statusEl.innerText = data.status;
+
+      if (data.status === "DANGER") {
+        statusEl.className = "danger";
+      } else {
+        statusEl.className = "safe";
+      }
+    });
+}
+
+setInterval(updateData, 2000);
+updateData();
+
+
+// -------- GRAPH --------
+let chart;
+
+function loadGraph() {
+  fetch('/history')
+    .then(res => res.json())
+    .then(data => {
+
+      let temps = data.map(row => row[1]).reverse();
+      let hums = data.map(row => row[2]).reverse();
+      let gas = data.map(row => row[3]).reverse();
+      let labels = data.map(row => row[4]).reverse();
+
+      const ctx = document.getElementById('chart').getContext('2d');
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '🌡️ Temp',
+              data: temps,
+              borderColor: 'red'
+            },
+            {
+              label: '💧 Humidity',
+              data: hums,
+              borderColor: 'blue'
+            },
+            {
+              label: '🔥 Gas',
+              data: gas,
+              borderColor: 'orange'
+            }
+          ]
+        }
+      });
+    });
+}
+
+setInterval(loadGraph, 5000);
+loadGraph();
+
+
+// -------- DOWNLOAD CSV --------
+function downloadData() {
+  fetch('/history')
+    .then(res => res.json())
+    .then(data => {
+
+      let csv = "Temp,Humidity,Gas,Time\n";
+
+      data.forEach(row => {
+        csv += `${row[1]},${row[2]},${row[3]},${row[4]}\n`;
+      });
+
+      let blob = new Blob([csv], { type: 'text/csv' });
+      let url = window.URL.createObjectURL(blob);
+
+      let a = document.createElement("a");
+      a.href = url;
+      a.download = "sensor_data.csv";
+      a.click();
+    });
+}
+</script>
+
+</body>
+</html>
